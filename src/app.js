@@ -1,5 +1,7 @@
 import cors from "cors";
 import express from "express";
+import passport from "passport";
+import "./config/passport.js";
 import { formDataParser } from "./middleware/formDataParser.js";
 import handleGlobalError from "./middleware/handelGlobalErrors.js";
 import { multerUpload } from "./middleware/multerUpload.js";
@@ -10,6 +12,7 @@ const expressServer = express();
 expressServer.use(cors());
 expressServer.use(express.json());
 expressServer.use(express.urlencoded({ extended: true }));
+expressServer.use(passport.initialize());
 
 expressServer.use(
   multerUpload.fields([
