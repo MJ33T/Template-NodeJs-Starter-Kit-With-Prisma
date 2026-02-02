@@ -64,8 +64,6 @@ export const loginUser = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return responseHelper.failed(res, "Invalid credentials", 401);
 
-    // Generate new hashed token
-    // const { token, expiresAt } = generateToken(user.id);
     const payload = { id: user.id, email: user.email };
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "7d",
