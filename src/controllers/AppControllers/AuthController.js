@@ -105,3 +105,33 @@ export const userProfile = async (req, res) => {
     return responseHelper.failed(res, error.message, 500);
   }
 };
+
+export const logoutUser = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return responseHelper.failed(res, "Token missing", 401);
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    const existingToken = await prisma.userToken.findFirst({
+      where: { token, revoked: false },
+    });
+
+    if (!existingToken) {
+      return responseHelper.failed(res, "Invalid or already logged out", 401);
+    }
+
+    await prisma.userToken.update({
+      where: { id: existingToken.id },
+      data: { revoked: true },
+    });
+
+    return responseHelper.success(res, null, "Logout successful", 200);
+  } catch (error) {
+    errorLogger.error(error.message);
+    return responseHelper.failed(res, "Logout failed", 500);
+  }
+};
