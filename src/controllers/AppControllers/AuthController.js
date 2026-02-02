@@ -116,22 +116,17 @@ export const logoutUser = async (req, res) => {
 
     const token = authHeader.split(" ")[1];
 
-    const existingToken = await prisma.userToken.findFirst({
-      where: { token, revoked: false },
+    const deleted = await prisma.userToken.deleteMany({
+      where: { token },
     });
 
-    if (!existingToken) {
+    if (deleted.count === 0) {
       return responseHelper.failed(res, "Invalid or already logged out", 401);
     }
 
-    await prisma.userToken.update({
-      where: { id: existingToken.id },
-      data: { revoked: true },
-    });
-
     return responseHelper.success(res, null, "Logout successful", 200);
   } catch (error) {
-    errorLogger.error(error.message);
+    errorLogger.error("Logout Error:", error.message);
     return responseHelper.failed(res, "Logout failed", 500);
   }
 };
