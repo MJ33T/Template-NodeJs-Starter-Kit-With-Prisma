@@ -1,29 +1,27 @@
+import dotenv from "dotenv";
 import passport from "passport";
-import { Strategy as BearerStrategy } from "passport-http-bearer";
-import prisma from "./prisma.js";
+import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
+import prisma from "../config/prisma.js"; // adjust path
+
+dotenv.config();
+
+const opts = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: process.env.JWT_SECRET,
+};
 
 passport.use(
-  new BearerStrategy(async (token, done) => {
+  new JwtStrategy(opts, async (jwt_payload, done) => {
     try {
-      const tokenRecord = await prisma.userToken.findFirst({
-        where: {
-          token,
-          revoked: false,
-          expiresAt: { gt: new Date() },
-        },
-      });
-
-      if (!tokenRecord) return done(null, false);
-
       const user = await prisma.user.findUnique({
-        where: { id: tokenRecord.userId },
+        where: { id: jwt_payload.id },
       });
-
-      if (!user) return done(null, false);
-
-      return done(null, user);
+      if (user) return done(null, user);
+      return done(null, false);
     } catch (err) {
-      return done(err);
+      return done(err, false);
     }
   }),
 );
+
+export default passport;
