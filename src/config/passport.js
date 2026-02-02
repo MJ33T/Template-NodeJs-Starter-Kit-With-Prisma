@@ -1,11 +1,24 @@
+import dotenv from "dotenv";
 import passport from "passport";
-import { Strategy as BearerStrategy } from "passport-http-bearer";
-import prisma from "./prisma.js";
+import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
+import prisma from "../config/prisma.js";
+
+dotenv.config();
+
+const opts = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: process.env.JWT_SECRET,
+  passReqToCallback: true, // 👈 REQUIRED
+};
 
 passport.use(
-  new BearerStrategy(async (token, done) => {
+  new JwtStrategy(opts, async (req, jwt_payload, done) => {
     try {
-      const tokenRecord = await prisma.userToken.findFirst({
+      // 1️⃣ Extract raw token
+      const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+
+      // 2️⃣ Validate token from DB
+      const dbToken = await prisma.userToken.findFirst({
         where: {
           token,
           revoked: false,
@@ -13,17 +26,24 @@ passport.use(
         },
       });
 
-      if (!tokenRecord) return done(null, false);
+      if (!dbToken) {
+        return done(null, false); // ❌ logged out / expired
+      }
 
+      // 3️⃣ Fetch user
       const user = await prisma.user.findUnique({
-        where: { id: tokenRecord.userId },
+        where: { id: jwt_payload.id },
       });
 
-      if (!user) return done(null, false);
+      if (!user) {
+        return done(null, false);
+      }
 
-      return done(null, user);
+      return done(null, user); // ✅ authenticated
     } catch (err) {
-      return done(err);
+      return done(err, false);
     }
   }),
 );
+
+export default passport;

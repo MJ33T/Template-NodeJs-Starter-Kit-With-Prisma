@@ -1,6 +1,7 @@
 import express from "express";
 import {
   loginUser,
+  logoutUser,
   registerUser,
   userProfile,
 } from "../controllers/AppControllers/AuthController.js";
@@ -13,5 +14,7 @@ router.post("/login", loginUser);
 
 // Auth folded routes
 router.get("/profile", auth, userProfile);
+
+router.post("/logout", auth, logoutUser);
 
 export const appRoutes = router;

@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { errorLogger } from "../../config/logger.js";
 import prisma from "../../config/prisma.js";
 import { validate } from "../../middleware/validationMiddleware.js";
 import responseHelper from "../../utils/responseHelper.js";
-import { generateToken } from "../../utils/tokenHelper.js";
 import {
   appUserLoginSchema,
   appUserRegistrationOtpSchema,
@@ -25,8 +25,12 @@ export const registerUser = async (req, res) => {
       data: { name, email, password: hashedPassword },
     });
 
-    // Generate hashed token using env secret
-    const { token, expiresAt } = generateToken(newUser.id);
+    // Generate JWT token
+    const payload = { id: newUser.id, email: newUser.email };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     await prisma.userToken.create({
       data: { userId: newUser.id, token, expiresAt, revoked: false },
@@ -45,8 +49,8 @@ export const registerUser = async (req, res) => {
       201,
     );
   } catch (error) {
-    errorLogger.error("Registration Error: ", error.message);
-    return responseHelper.failed(res, error.message, 500);
+    errorLogger.error(error.message);
+    return responseHelper.failed(res, error, 500);
   }
 };
 
@@ -60,8 +64,11 @@ export const loginUser = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return responseHelper.failed(res, "Invalid credentials", 401);
 
-    // Generate new hashed token
-    const { token, expiresAt } = generateToken(user.id);
+    const payload = { id: user.id, email: user.email };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     await prisma.userToken.create({
       data: { userId: user.id, token, expiresAt, revoked: false },
@@ -94,5 +101,30 @@ export const userProfile = async (req, res) => {
   } catch (error) {
     errorLogger.error("User Profile Error: ", error.message);
     return responseHelper.failed(res, error.message, 500);
+  }
+};
+
+export const logoutUser = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return responseHelper.failed(res, "Token missing", 401);
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    const deleted = await prisma.userToken.deleteMany({
+      where: { token },
+    });
+
+    if (deleted.count === 0) {
+      return responseHelper.failed(res, "Invalid or already logged out", 401);
+    }
+
+    return responseHelper.success(res, null, "Logout successful", 200);
+  } catch (error) {
+    errorLogger.error("Logout Error:", error.message);
+    return responseHelper.failed(res, "Logout failed", 500);
   }
 };
